@@ -1,34 +1,36 @@
-import sys
-from Adafruit_IO import MQTTClient
+import serial.tools.list_ports
+import random
 import time
-import serial . tools . list_ports
+import  sys
+from  Adafruit_IO import  MQTTClient
 
 AIO_FEED_ID = ["bbc-led", "bbc-lux", "bbc-temp"]
 AIO_USERNAME = "ngocphim96"
-AIO_KEY = "aio_ceRX80B90f9R6kzVvksP1DUSY8J6"
-mess = ""
-client = None
-ser = None
+AIO_KEY = "aio_kGTY66UgKeHYdU2kk2X0oqTaHbGB"
 
-
-def connected(client):
-    print("Ket noi thanh cong ...")
+def  connected(client):
+    print("Ket noi thanh cong...")
     for feed in AIO_FEED_ID:
         client.subscribe(feed)
 
+def  subscribe(client , userdata , mid , granted_qos):
+    print("Subcribe thanh cong...")
 
-def subscribe(client, userdata, mid, granted_qos):
-    print("Subcribe thanh cong ...")
+def  disconnected(client):
+    print("Ngat ket noi...")
+    sys.exit (1)
 
-
-def disconnected(client):
-    print("Ngat ket noi ...")
-    sys.exit(1)
-
-
-def message(client, feed_id, payload):
+def  message(client , feed_id , payload):
+    print("Nhan du lieu: " + payload)
     ser.write((str(payload) + "#").encode())
 
+client = MQTTClient(AIO_USERNAME , AIO_KEY)
+client.on_connect = connected
+client.on_disconnect = disconnected
+client.on_message = message
+client.on_subscribe = subscribe
+client.connect()
+client.loop_background()
 
 def getPort():
     ports = serial.tools.list_ports.comports()
@@ -42,7 +44,9 @@ def getPort():
             commPort = (splitPort[0])
     return commPort
 
+ser = serial.Serial( port=getPort(), baudrate=115200)
 
+mess = ""
 def processData(data):
     data = data.replace("!", "")
     data = data.replace("#", "")
@@ -53,39 +57,21 @@ def processData(data):
     if splitData[1] == "LUX":
         client.publish("bbc-lux", splitData[2])
 
-
+mess = ""
 def readSerial():
     bytesToRead = ser.inWaiting()
-    if bytesToRead > 0:
+    if (bytesToRead > 0):
         global mess
-        mess = mess + ser.read(bytesToRead).decode("UTF -8")
-    while "#" in mess and "!" in mess:
-        start = mess.find("!")
-        end = mess.find("#")
-        processData(mess[start:end + 1])
-        if end == len(mess):
-            mess = ""
-        else:
-            mess = mess[end + 1:]
-    return mess
+        mess = mess + ser.read(bytesToRead).decode("UTF-8")
+        while ("#" in mess) and ("!" in mess):
+            start = mess.find("!")
+            end = mess.find("#")
+            processData(mess[start:end + 1])
+            if (end == len(mess)):
+                mess = ""
+            else:
+                mess = mess[end+1:]
 
-
-def main():
-    global client, ser
-
-    client = MQTTClient(AIO_USERNAME, AIO_KEY)
-    client.on_connect = connected
-    client.on_disconnect = disconnected
-    client.on_message = message
-    client.on_subscribe = subscribe
-    client.connect()
-    client.loop_background()
-
-    ser = serial.Serial(port=getPort(), baudrate=115200)
-
-    while True:
-        readSerial()
-
-
-if __name__ == "__main__":
-    main()
+while True:
+    readSerial()
+    time.sleep(1)
